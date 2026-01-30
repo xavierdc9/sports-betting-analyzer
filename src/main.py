@@ -7,9 +7,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from src.api.routes import alerts, events, odds, sports
+from src.api.routes import alerts, events, odds, scraper, sports
 from src.config import settings
 from src.database import engine
+from src.scheduler import start_scheduler, stop_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +26,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Database connection failed: %s", e)
 
+    # Start scheduled scraping if API key is configured
+    if settings.the_odds_api_key:
+        start_scheduler()
+
     yield
 
     # Shutdown
+    stop_scheduler()
     await engine.dispose()
 
 
@@ -51,6 +57,7 @@ app.include_router(sports.router)
 app.include_router(events.router)
 app.include_router(odds.router)
 app.include_router(alerts.router)
+app.include_router(scraper.router)
 
 
 @app.get("/health")
