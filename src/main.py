@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+from src.api.routes import alerts, events, odds, sports
 from src.config import settings
 from src.database import engine
 
@@ -43,6 +44,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Register API routers
+app.include_router(sports.router)
+app.include_router(events.router)
+app.include_router(odds.router)
+app.include_router(alerts.router)
 
 
 @app.get("/health")
