@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from src.api.routes import alerts, events, odds, scraper, sports
+from src.api.routes import alerts, events, odds, polymarket, scraper, sports
 from src.config import settings
 from src.database import engine
 from src.scheduler import start_scheduler, stop_scheduler
@@ -58,6 +58,7 @@ app.include_router(events.router)
 app.include_router(odds.router)
 app.include_router(alerts.router)
 app.include_router(scraper.router)
+app.include_router(polymarket.router)
 
 
 @app.get("/health")
