@@ -1,5 +1,7 @@
 """Application configuration loaded from environment variables."""
 
+from typing import List
+
 from pydantic_settings import BaseSettings
 
 
@@ -22,6 +24,12 @@ class Settings(BaseSettings):
     # App
     app_version: str = "0.1.0"
     debug: bool = False
+
+    # CORS
+    cors_origins: List[str] = [
+        "https://follow-the-flows.vercel.app",
+        "http://localhost:3000",
+    ]
 
     model_config = {
         "env_file": ".env",

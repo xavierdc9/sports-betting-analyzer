@@ -3,13 +3,17 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 
 from src.api.routes import alerts, events, odds, polymarket, scraper, sports
 from src.config import settings
 from src.database import engine
+from src.rate_limit import limiter
 from src.scheduler import start_scheduler, stop_scheduler
 
 logger = logging.getLogger(__name__)
@@ -43,9 +47,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Attach limiter to app state (required by slowapi)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
