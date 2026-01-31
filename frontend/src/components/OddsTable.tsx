@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { Event, OddsRecord } from "@/lib/types";
-import { api } from "@/lib/api";
+import { api, getErrorMessage } from "@/lib/api";
+import ErrorBanner from "./ErrorBanner";
 
 interface OddsTableProps {
   events: Event[];
@@ -12,8 +13,13 @@ interface GroupedOdds {
   [eventId: string]: OddsRecord[];
 }
 
+interface FailedEvents {
+  [eventId: string]: string;
+}
+
 export default function OddsTable({ events }: OddsTableProps) {
   const [oddsByEvent, setOddsByEvent] = useState<GroupedOdds>({});
+  const [failedEvents, setFailedEvents] = useState<FailedEvents>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,21 +28,26 @@ export default function OddsTable({ events }: OddsTableProps) {
       return;
     }
 
+    const displayed = events.slice(0, 10);
+
     Promise.all(
-      events.slice(0, 10).map(async (event) => {
+      displayed.map(async (event) => {
         try {
           const odds = await api.getOdds(event.id);
-          return { eventId: event.id, odds };
-        } catch {
-          return { eventId: event.id, odds: [] };
+          return { eventId: event.id, odds, error: null };
+        } catch (err) {
+          return { eventId: event.id, odds: [], error: getErrorMessage(err) };
         }
       })
     ).then((results) => {
       const grouped: GroupedOdds = {};
-      for (const { eventId, odds } of results) {
+      const failed: FailedEvents = {};
+      for (const { eventId, odds, error } of results) {
         grouped[eventId] = odds;
+        if (error) failed[eventId] = error;
       }
       setOddsByEvent(grouped);
+      setFailedEvents(failed);
       setLoading(false);
     });
   }, [events]);
@@ -51,11 +62,23 @@ export default function OddsTable({ events }: OddsTableProps) {
     );
   }
 
+  // If ALL events failed, show a single error banner
+  const displayedEvents = events.slice(0, 10);
+  const allFailed =
+    displayedEvents.length > 0 &&
+    displayedEvents.every((e) => failedEvents[e.id]);
+
+  if (allFailed) {
+    const msg = Object.values(failedEvents)[0] || "Failed to load odds";
+    return <ErrorBanner message={msg} />;
+  }
+
   return (
     <div className="space-y-4">
-      {events.slice(0, 10).map((event) => {
+      {displayedEvents.map((event) => {
         const odds = oddsByEvent[event.id] || [];
         const h2hOdds = odds.filter((o) => o.market_type === "h2h");
+        const eventError = failedEvents[event.id];
 
         return (
           <div
@@ -73,7 +96,11 @@ export default function OddsTable({ events }: OddsTableProps) {
               </div>
             </div>
 
-            {h2hOdds.length > 0 ? (
+            {eventError ? (
+              <p className="text-xs text-red-400">
+                Failed to load odds: {eventError}
+              </p>
+            ) : h2hOdds.length > 0 ? (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-[var(--text-secondary)] text-xs">

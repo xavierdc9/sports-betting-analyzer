@@ -1,29 +1,37 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import OddsTable from "@/components/OddsTable";
+import ErrorBanner from "@/components/ErrorBanner";
 import type { Event, Sport } from "@/lib/types";
-import { api } from "@/lib/api";
+import { api, getErrorMessage } from "@/lib/api";
 
 export default function OddsPage() {
   const [sports, setSports] = useState<Sport[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedSport, setSelectedSport] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api.getSports().then(setSports).catch(() => setSports([]));
   }, []);
 
-  useEffect(() => {
+  const loadEvents = useCallback(() => {
+    setError(null);
     setLoading(true);
     api
       .getEvents(selectedSport || undefined)
       .then(setEvents)
-      .catch(() => setEvents([]))
+      .catch((err) => {
+        setEvents([]);
+        setError(getErrorMessage(err));
+      })
       .finally(() => setLoading(false));
   }, [selectedSport]);
+
+  useEffect(() => { loadEvents(); }, [loadEvents]);
 
   return (
     <div className="flex">
@@ -50,7 +58,9 @@ export default function OddsPage() {
           </select>
         </div>
 
-        {loading ? (
+        {error ? (
+          <ErrorBanner message={error} onRetry={loadEvents} />
+        ) : loading ? (
           <div className="text-[var(--text-secondary)]">Loading...</div>
         ) : (
           <OddsTable events={events} />

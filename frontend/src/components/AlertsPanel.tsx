@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Alert } from "@/lib/types";
-import { api } from "@/lib/api";
+import { api, getErrorMessage } from "@/lib/api";
+import ErrorBanner from "./ErrorBanner";
 
 const TYPE_COLORS: Record<string, string> = {
   arbitrage: "bg-green-600",
@@ -13,21 +14,37 @@ const TYPE_COLORS: Record<string, string> = {
 export default function AlertsPanel() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadAlerts = useCallback(() => {
+    setError(null);
+    setLoading(true);
     api
       .getAlerts()
       .then(setAlerts)
-      .catch(() => setAlerts([]))
+      .catch((err) => {
+        setAlerts([]);
+        setError(getErrorMessage(err));
+      })
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => { loadAlerts(); }, [loadAlerts]);
+
   const handleMarkRead = async (id: string) => {
-    await api.markAlertRead(id);
-    setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, is_read: true } : a)));
+    try {
+      await api.markAlertRead(id);
+      setAlerts((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, is_read: true } : a))
+      );
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
   };
 
   if (loading) return <div className="text-[var(--text-secondary)]">Loading alerts...</div>;
+
+  if (error) return <ErrorBanner message={error} onRetry={loadAlerts} />;
 
   if (alerts.length === 0) {
     return (

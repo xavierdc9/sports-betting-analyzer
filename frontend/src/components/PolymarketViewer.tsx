@@ -1,22 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { PolymarketMarket } from "@/lib/types";
-import { api } from "@/lib/api";
+import { api, getErrorMessage } from "@/lib/api";
+import ErrorBanner from "./ErrorBanner";
 
 export default function PolymarketViewer() {
   const [markets, setMarkets] = useState<PolymarketMarket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<string>("");
 
-  useEffect(() => {
+  const loadMarkets = useCallback(() => {
+    setError(null);
     setLoading(true);
     api
       .getPolymarkets(category || undefined)
       .then(setMarkets)
-      .catch(() => setMarkets([]))
+      .catch((err) => {
+        setMarkets([]);
+        setError(getErrorMessage(err));
+      })
       .finally(() => setLoading(false));
   }, [category]);
+
+  useEffect(() => { loadMarkets(); }, [loadMarkets]);
 
   const categories = ["", "NFL", "NBA", "MLB"];
 
@@ -40,6 +48,8 @@ export default function PolymarketViewer() {
 
       {loading ? (
         <div className="text-[var(--text-secondary)]">Loading markets...</div>
+      ) : error ? (
+        <ErrorBanner message={error} onRetry={loadMarkets} />
       ) : markets.length === 0 ? (
         <div className="text-center text-[var(--text-secondary)] py-8">
           No prediction markets found.

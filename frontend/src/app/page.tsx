@@ -1,33 +1,49 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import AlertsPanel from "@/components/AlertsPanel";
 import OddsTable from "@/components/OddsTable";
+import ErrorBanner from "@/components/ErrorBanner";
 import type { Event, Sport } from "@/lib/types";
-import { api } from "@/lib/api";
+import { api, getErrorMessage } from "@/lib/api";
 
 export default function Dashboard() {
   const [sports, setSports] = useState<Sport[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedSport, setSelectedSport] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [sportsError, setSportsError] = useState<string | null>(null);
+  const [eventsError, setEventsError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadSports = useCallback(() => {
+    setSportsError(null);
     api
       .getSports()
       .then(setSports)
-      .catch(() => setSports([]));
+      .catch((err) => {
+        setSports([]);
+        setSportsError(getErrorMessage(err));
+      });
   }, []);
 
-  useEffect(() => {
+  const loadEvents = useCallback(() => {
+    setEventsError(null);
     setLoading(true);
     api
       .getEvents(selectedSport || undefined)
       .then(setEvents)
-      .catch(() => setEvents([]))
+      .catch((err) => {
+        setEvents([]);
+        setEventsError(getErrorMessage(err));
+      })
       .finally(() => setLoading(false));
   }, [selectedSport]);
+
+  useEffect(() => { loadSports(); }, [loadSports]);
+  useEffect(() => { loadEvents(); }, [loadEvents]);
+
+  const apiConnected = !sportsError && !eventsError;
 
   return (
     <div className="flex">
@@ -42,11 +58,22 @@ export default function Dashboard() {
 
         {/* Stats row */}
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <StatCard label="Active Sports" value={sports.length} />
-          <StatCard label="Upcoming Events" value={events.length} />
+          <StatCard label="Active Sports" value={sportsError ? "—" : sports.length} />
+          <StatCard label="Upcoming Events" value={eventsError ? "—" : events.length} />
           <StatCard label="Markets Tracked" value="h2h, spreads, totals" isText />
-          <StatCard label="API Status" value="Connected" isText />
+          <StatCard
+            label="API Status"
+            value={apiConnected ? "Connected" : "Error"}
+            isText
+            variant={apiConnected ? "default" : "error"}
+          />
         </div>
+
+        {sportsError && (
+          <div className="mb-4">
+            <ErrorBanner message={`Sports: ${sportsError}`} onRetry={loadSports} />
+          </div>
+        )}
 
         <div className="grid grid-cols-3 gap-6">
           {/* Main odds section */}
@@ -67,7 +94,9 @@ export default function Dashboard() {
               </select>
             </div>
 
-            {loading ? (
+            {eventsError ? (
+              <ErrorBanner message={eventsError} onRetry={loadEvents} />
+            ) : loading ? (
               <div className="text-[var(--text-secondary)]">Loading events...</div>
             ) : (
               <OddsTable events={events} />
@@ -89,15 +118,26 @@ function StatCard({
   label,
   value,
   isText,
+  variant = "default",
 }: {
   label: string;
   value: number | string;
   isText?: boolean;
+  variant?: "default" | "error";
 }) {
+  const borderClass =
+    variant === "error"
+      ? "border-red-700/50"
+      : "border-[var(--border)]";
+  const valueClass =
+    variant === "error" ? "text-red-400" : "";
+
   return (
-    <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded p-4">
+    <div className={`bg-[var(--bg-card)] border ${borderClass} rounded p-4`}>
       <p className="text-xs text-[var(--text-secondary)] mb-1">{label}</p>
-      <p className={`${isText ? "text-sm" : "text-2xl"} font-bold`}>{value}</p>
+      <p className={`${isText ? "text-sm" : "text-2xl"} font-bold ${valueClass}`}>
+        {value}
+      </p>
     </div>
   );
 }
